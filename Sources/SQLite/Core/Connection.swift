@@ -190,7 +190,9 @@ public final class Connection {
     ///
     /// - Returns: A prepared statement.
     public func prepare(_ statement: String, _ bindings: [Binding?]) throws -> Statement {
-        return try prepare(statement).bind(bindings)
+        return try sync {
+            return try prepare(statement).bind(bindings)
+        }
     }
 
     /// Prepares a single SQL statement and binds parameters to it.
@@ -203,7 +205,9 @@ public final class Connection {
     ///
     /// - Returns: A prepared statement.
     public func prepare(_ statement: String, _ bindings: [String: Binding?]) throws -> Statement {
-        return try prepare(statement).bind(bindings)
+        return try sync {
+            return try prepare(statement).bind(bindings)
+        }
     }
 
     // MARK: - Run
@@ -220,7 +224,9 @@ public final class Connection {
     ///
     /// - Returns: The statement.
     @discardableResult public func run(_ statement: String, _ bindings: Binding?...) throws -> Statement {
-        return try run(statement, bindings)
+        return try sync {
+            return try run(statement, bindings)
+        }
     }
 
     /// Prepares, binds, and runs a single SQL statement.
@@ -235,7 +241,9 @@ public final class Connection {
     ///
     /// - Returns: The statement.
     @discardableResult public func run(_ statement: String, _ bindings: [Binding?]) throws -> Statement {
-        return try prepare(statement).run(bindings)
+        return try sync {
+            return try prepare(statement).run(bindings)
+        }
     }
 
     /// Prepares, binds, and runs a single SQL statement.
@@ -250,7 +258,9 @@ public final class Connection {
     ///
     /// - Returns: The statement.
     @discardableResult public func run(_ statement: String, _ bindings: [String: Binding?]) throws -> Statement {
-        return try prepare(statement).run(bindings)
+        return try sync {
+            return try prepare(statement).run(bindings)
+        }
     }
 
     // MARK: - Scalar
@@ -266,7 +276,9 @@ public final class Connection {
     ///
     /// - Returns: The first value of the first row returned.
     public func scalar(_ statement: String, _ bindings: Binding?...) throws -> Binding? {
-        return try scalar(statement, bindings)
+        return try sync {
+            return try scalar(statement, bindings)
+        }
     }
 
     /// Runs a single SQL statement (with optional parameter bindings),
@@ -280,7 +292,9 @@ public final class Connection {
     ///
     /// - Returns: The first value of the first row returned.
     public func scalar(_ statement: String, _ bindings: [Binding?]) throws -> Binding? {
-        return try prepare(statement).scalar(bindings)
+        return try sync {
+            return try prepare(statement).scalar(bindings)
+        }
     }
 
     /// Runs a single SQL statement (with optional parameter bindings),
@@ -294,7 +308,9 @@ public final class Connection {
     ///
     /// - Returns: The first value of the first row returned.
     public func scalar(_ statement: String, _ bindings: [String: Binding?]) throws -> Binding? {
-        return try prepare(statement).scalar(bindings)
+        return try sync {
+            return try prepare(statement).scalar(bindings)
+        }
     }
 
     // MARK: - Transactions
@@ -634,7 +650,7 @@ public final class Connection {
         if DispatchQueue.getSpecific(key: Connection.queueKey) == queueContext {
             return try block()
         } else {
-            return try queue.sync(execute: block)
+            return try queue.sync(flags: .barrier, execute: block)
         }
     }
 
@@ -645,9 +661,9 @@ public final class Connection {
 
         throw error
     }
-
-    fileprivate var queue = DispatchQueue(label: "SQLite.Database", attributes: [])
-
+    
+    fileprivate var queue = DispatchQueue(label: "SQLite.Database", attributes: .concurrent)
+    
     fileprivate static let queueKey = DispatchSpecificKey<Int>()
 
     fileprivate lazy var queueContext: Int = unsafeBitCast(self, to: Int.self)
